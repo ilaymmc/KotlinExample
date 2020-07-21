@@ -1,11 +1,9 @@
 package ru.skillbranch.kotlinexample
 
 import androidx.annotation.VisibleForTesting
-import java.lang.IllegalArgumentException
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.util.*
 
 class User private constructor (
     private val firstName: String,
@@ -25,7 +23,7 @@ class User private constructor (
             .joinToString(" ")
     private var phone: String? = null
         set(value) {
-            field = value?.trimPhone()
+            field = value?.trimLogin()
         }
     private var _salt: String? = null
     private var _login: String? = null
@@ -170,22 +168,24 @@ class User private constructor (
             return this.split(" ")
                 .filter { it.isNotBlank() }
                 .run {
-                    when(size) {
+                    when (size) {
                         1 -> first() to null
                         2 -> first() to last()
-                        else -> throw IllegalArgumentException("Fullname must contain only first name " +
-                                "and last name, curent split result ${this@fullNameToPair}")
+                        else -> throw IllegalArgumentException(
+                            "Fullname must contain only first name " +
+                                    "and last name, curent split result ${this@fullNameToPair}"
+                        )
                     }
                 }
         }
 
-        fun String.trimPhone() : String =
-            replace("[^+\\d]".toRegex(),"")
+        fun String.trimLogin(): String =
+            replace("[^+@._\\w]".toRegex(), "")
 
         fun isPhoneValid(rawPhone: String): Boolean =
             with(rawPhone) {
                 matches("[\\s+\\-()\\d]+".toRegex()) &&
-                        trimPhone().run {
+                        trimLogin().run {
                             length == 12
                                     && startsWith("+")
                         }

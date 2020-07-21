@@ -1,6 +1,6 @@
 package ru.skillbranch.kotlinexample
 
-import ru.skillbranch.kotlinexample.User.Factory.trimPhone
+import ru.skillbranch.kotlinexample.User.Factory.trimLogin
 
 object UserHolder {
     private val map = mutableMapOf<String, User>()
@@ -18,6 +18,7 @@ object UserHolder {
         email: String,
         password: String
     ) : User {
+    println(">> registerUser(fullName = $fullName, email = $email, password = $password)")
         return User.makeUser(fullName, email = email, password = password)
             .also { addUniqUser(it, "A user with this email already exists") }
     }
@@ -30,22 +31,26 @@ object UserHolder {
 //  иначе необходимо бросить исключение IllegalArgumentException("Enter a valid phone number starting with a + and containing 11 digits")
 
     fun registerUserByPhone(fullName : String, rawPhone: String): User {
+        println(">> registerUserByPhone(fullName = $fullName, rawPhone = $rawPhone")
         if (!User.isPhoneValid(rawPhone))
             throw IllegalArgumentException("Enter a valid phone number starting with a + and containing 11 digits")
         return User.makeUser(fullName, phone = rawPhone)
             .also { addUniqUser(it, "A user with this phone already exists") }
     }
 
-    fun loginUser(login: String, password: String) : String? {
-        return map[login.trimPhone()]?.run {
+    fun loginUser(login: String, password: String): String? {
+        println(">> loginUser(login = $login, password = $password")
+        return map[login.trimLogin()]?.run {
             if (checkPassword(password)) this.userInfo
             else null
         }
     }
 
-    fun importUsers(csv: List<String>) : List<User> =
-        csv.mapNotNull { lineStr ->
-            lineStr.trim().split(";").takeIf { it.size >= 3 } ?.let { line ->
+    fun importUsers(csv: List<String>): List<User> {
+        println(">> importUsers")
+        return csv.mapNotNull { lineStr ->
+            println("l: '$lineStr'")
+            lineStr.trim().split(";").takeIf { it.size >= 3 }?.let { line ->
                 val (salt, pass) = line[2].split(":").let { it[0] to it[1] }
                 val fullName = line[0]
                 val email = line[1].takeIf { it.isNotEmpty() }
@@ -57,9 +62,13 @@ object UserHolder {
                     rawPhone = rawPhone,
                     salt = salt,
                     passwordHash = pass
-                )
+                ).also {
+                    map[it.login] = it
+//                    addUniqUser(it, "A user with this login already exists")
+                }
             }
         }
+    }
 
 
     fun clearHolder() {
@@ -71,8 +80,9 @@ object UserHolder {
 //  и помещен в свойство accessCode, соответственно должен измениться и хеш пароля пользователя
 //  (вызов метода loginUser должен отрабатывать корректно)
     fun requestAccessCode(rawPhone: String) {
-        val phone = rawPhone.trimPhone()
-        map[phone]?.resetAccessCode()
-    }
+    println(">> requestAccessCode(rawPhone = $rawPhone")
+    val phone = rawPhone.trimLogin()
+    map[phone]?.resetAccessCode()
+}
 
 }
