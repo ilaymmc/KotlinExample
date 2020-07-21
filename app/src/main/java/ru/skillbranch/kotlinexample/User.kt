@@ -5,6 +5,7 @@ import java.lang.IllegalArgumentException
 import java.math.BigInteger
 import java.security.MessageDigest
 import java.security.SecureRandom
+import java.util.*
 
 class User private constructor (
     private val firstName: String,
@@ -24,15 +25,18 @@ class User private constructor (
             .joinToString(" ")
     private var phone: String? = null
         set(value) {
-            field = value?.replace("[^+\\d]".toRegex(),"")
+            field = value?.trimPhone()
         }
+    private var _salt: String? = null
     private var _login: String? = null
     internal var login: String
         set(value) {
-            _login = value?.toLowerCase()
+            _login = value.toLowerCase()
         }
         get() = _login!!
+
     private val salt: String by lazy {
+        _salt ?:
         ByteArray(16).also { SecureRandom().nextBytes(it) }.toString()
     }
 
@@ -45,6 +49,19 @@ class User private constructor (
         firstName: String,
         lastName: String?,
         email: String?,
+        rawPhone: String?,
+        salt: String,
+        passwordHash: String
+    ): this(firstName, lastName, email = email, rawPhone = rawPhone, meta = mapOf("src" to "csv")) {
+        println("Secondary csv constructor")
+        this.passwordHash = passwordHash
+        this._salt = salt
+    }
+
+    constructor(
+        firstName: String,
+        lastName: String?,
+        email: String,
         password: String
     ): this(firstName, lastName, email = email, meta = mapOf("auth" to "password")) {
         println("Secondary mail constructor")
@@ -56,11 +73,8 @@ class User private constructor (
         lastName: String?,
         rawPhone: String
     ): this(firstName, lastName, rawPhone = rawPhone, meta = mapOf("auth" to "sms")) {
-        println("Secondary mail constructor")
-        val code = generateAccessCode()
-        passwordHash = encrypt(code)
-        accessCode = code
-        sendAccessCodeToUser(rawPhone, code)
+        println("Secondary phone constructor")
+        resetAccessCode()
     }
 
     init {
@@ -85,6 +99,15 @@ class User private constructor (
     }
 
     fun checkPassword(password: String) = encrypt(password) == passwordHash
+
+    fun resetAccessCode() {
+        phone?.let { phone ->
+            val code = generateAccessCode()
+            passwordHash = encrypt(code)
+            accessCode = code
+            sendAccessCodeToUser(phone, code)
+        }
+    }
 
     fun changePassword(oldPassword: String, newPassword: String) {
         if (checkPassword(oldPassword)) passwordHash = encrypt(newPassword)
@@ -132,6 +155,17 @@ class User private constructor (
             }
         }
 
+        fun importUser(
+            fullName: String,
+            email: String?,
+            rawPhone: String?,
+            passwordHash: String,
+            salt:String
+        ): User {
+            val (firstName, lastName) = fullName.fullNameToPair()
+            return User(firstName, lastName, email = email, rawPhone = rawPhone, salt = salt, passwordHash = passwordHash)
+        }
+
         private fun String.fullNameToPair() : Pair<String, String?> {
             return this.split(" ")
                 .filter { it.isNotBlank() }
@@ -144,5 +178,17 @@ class User private constructor (
                     }
                 }
         }
+
+        fun String.trimPhone() : String =
+            replace("[^+\\d]".toRegex(),"")
+
+        fun isPhoneValid(rawPhone: String): Boolean =
+            with(rawPhone) {
+                matches("[\\s+\\-()\\d]+".toRegex()) &&
+                        trimPhone().run {
+                            length == 12
+                                    && startsWith("+")
+                        }
+            }
     }
 }
